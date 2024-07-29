@@ -4,11 +4,12 @@ use super::{types::Enum, Error, Result};
 use handlebars::Handlebars;
 
 const ENUM_TEMPLATE: &str = r#"
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 {{#if description}}
-/// {{description}}
+/** 
+ * {{description}}
+ */
 {{/if}}
-pub enum {{name}} {
+export enum {{name}} {
     {{#each variants}}
     {{name}}{{#if value}} = "{{value
     }}"{{/if}},
@@ -17,16 +18,21 @@ pub enum {{name}} {
 "#;
 
 const STRUCT_TEMPLATE: &str = r#"
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 {{#if description}}
-/// {{description}}
+/** 
+ * {{description}}
+ */
 {{/if}}
-pub struct {{name}} {
+export interface {{name}} {
     {{#each fields}}
     {{#if description}}
     /// {{description}}
     {{/if}}
-    pub {{name}}: {{#if is_array}}Vec<{{/if}}{{#unless required}}Option<{{/unless}}{{type_.Value}}{{type_.Ref}}{{#unless required}}>{{/unless}}{{#if is_array}}>{{/if}},
+    {{#if is_array}}
+    {{name}}: Array<{{type_.Value}}{{type_.Ref}}{{#unless required}} | undefined{{/unless}}>;
+    {{else}}
+    {{name}}{{#unless required}}?{{/unless}}: {{type_.Value}}{{type_.Ref}}{{#if is_array}}[]{{/if}};
+    {{/if}}
     {{/each}}
 }
 "#;
@@ -87,9 +93,10 @@ mod tests {
         };
 
         let expected = r#"
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-/// Description
-pub enum Color {
+/** 
+ * Description
+ */
+export enum Color {
     Red = "1",
     Green = "2",
 }
@@ -119,8 +126,7 @@ pub enum Color {
         };
 
         let expected = r#"
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum Color {
+export enum Color {
     Red,
     Green,
 }
@@ -135,11 +141,12 @@ pub enum Color {
     #[test]
     fn test_render_struct_template_simple() {
         let expected = r#"
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-/// Description
-pub struct Point {
-    pub x: i32,
-    pub y: i32,
+/** 
+ * Description
+ */
+export interface Point {
+    x: number;
+    y: number;
 }
 "#
         .to_string();
@@ -151,14 +158,14 @@ pub struct Point {
                 types::StructField {
                     name: "x".to_string(),
                     description: None,
-                    type_: types::StructFieldType::Value("i32".to_string()),
+                    type_: types::StructFieldType::Value("number".to_string()),
                     required: true,
                     is_array: false,
                 },
                 types::StructField {
                     name: "y".to_string(),
                     description: None,
-                    type_: types::StructFieldType::Value("i32".to_string()),
+                    type_: types::StructFieldType::Value("number".to_string()),
                     required: true,
                     is_array: false,
                 },
@@ -173,30 +180,28 @@ pub struct Point {
     #[test]
     fn test_render_struct_template_optional() {
         let expected = r#"
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-/// Description
-pub struct Point {
-    pub x: Option<i32>,
-    pub y: Option<i32>,
+export interface Point {
+    x?: number;
+    y?: number;
 }
 "#
         .to_string();
 
         let s = types::Struct {
             name: "Point".to_string(),
-            description: Some("Description".to_string()),
+            description: None,
             fields: vec![
                 types::StructField {
                     name: "x".to_string(),
                     description: None,
-                    type_: types::StructFieldType::Value("i32".to_string()),
+                    type_: types::StructFieldType::Value("number".to_string()),
                     required: false,
                     is_array: false,
                 },
                 types::StructField {
                     name: "y".to_string(),
                     description: None,
-                    type_: types::StructFieldType::Value("i32".to_string()),
+                    type_: types::StructFieldType::Value("number".to_string()),
                     required: false,
                     is_array: false,
                 },
@@ -211,10 +216,9 @@ pub struct Point {
     #[test]
     fn test_render_struct_template_array() {
         let expected = r#"
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Point {
-    pub x: Vec<i32>,
-    pub y: Vec<i32>,
+export interface Point {
+    x: Array<number>;
+    y: Array<number>;
 }
 "#
         .to_string();
@@ -226,14 +230,14 @@ pub struct Point {
                 types::StructField {
                     name: "x".to_string(),
                     description: None,
-                    type_: types::StructFieldType::Value("i32".to_string()),
+                    type_: types::StructFieldType::Value("number".to_string()),
                     required: true,
                     is_array: true,
                 },
                 types::StructField {
                     name: "y".to_string(),
                     description: None,
-                    type_: types::StructFieldType::Value("i32".to_string()),
+                    type_: types::StructFieldType::Value("number".to_string()),
                     required: true,
                     is_array: true,
                 },
@@ -248,10 +252,9 @@ pub struct Point {
     #[test]
     fn test_render_struct_template_array_optional() {
         let expected = r#"
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Point {
-    pub x: Vec<Option<i32>>,
-    pub y: Vec<Option<i32>>,
+export interface Point {
+    x: Array<number | undefined>;
+    y: Array<number | undefined>;
 }
 "#
         .to_string();
@@ -263,14 +266,14 @@ pub struct Point {
                 types::StructField {
                     name: "x".to_string(),
                     description: None,
-                    type_: types::StructFieldType::Value("i32".to_string()),
+                    type_: types::StructFieldType::Value("number".to_string()),
                     required: false,
                     is_array: true,
                 },
                 types::StructField {
                     name: "y".to_string(),
                     description: None,
-                    type_: types::StructFieldType::Value("i32".to_string()),
+                    type_: types::StructFieldType::Value("number".to_string()),
                     required: false,
                     is_array: true,
                 },

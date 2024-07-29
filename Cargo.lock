@@ -14,7 +14,7 @@ dependencies = [
 [[package]]
 name = "apigen-plugin-utils"
 version = "0.1.0"
-source = "git+https://github.com/naskopw/apigen-plugin-utils.git?tag=v1.0.0#f86ea08834b00770062b0abc7c46caf88db429e5"
+source = "git+https://github.com/naskopw/apigen-plugin-utils.git?tag=v1.0.0#32728ea7cc02da9ddb1db32a01c15412cfbe8baa"
 dependencies = [
  "oas3",
  "serde",
@@ -23,7 +23,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "apigen-rs"
+name = "apigen-ts"
 version = "0.1.0"
 dependencies = [
  "apigen-plugin-utils",

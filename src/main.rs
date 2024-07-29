@@ -1,22 +1,22 @@
 mod templates;
-use apigen_plugin_utils::{error::Error, input, oas3_utils, parser::Parser, types, Result};
+use apigen_plugin_utils::{codegen::Codegen, error::Error, input, oas3_utils, types, Result};
 use convert_case::{Case, Casing};
 use oas3::spec::{ObjectOrReference, SchemaType};
 use serde_json::Number;
 
-struct ParserImpl<'a> {
+struct CodegenImpl<'a> {
     templates: templates::Templates<'a>,
 }
 
-impl<'a> ParserImpl<'a> {
+impl<'a> CodegenImpl<'a> {
     pub fn new() -> Self {
-        ParserImpl {
+        CodegenImpl {
             templates: templates::Templates::new(),
         }
     }
 }
 
-impl<'a> Parser for ParserImpl<'a> {
+impl<'a> Codegen for CodegenImpl<'a> {
     fn str_to_enum_variant(&mut self, name: &str) -> String {
         let name = name.to_case(Case::UpperCamel);
         if name.chars().next().unwrap_or_default().is_numeric() {
@@ -36,52 +36,21 @@ impl<'a> Parser for ParserImpl<'a> {
         } else {
             name.to_string()
         };
-        name.to_case(Case::Snake)
+        name.to_case(Case::Camel)
     }
 
     fn map_oas3_to_output_type(
         &mut self,
         oas3_type: oas3::spec::SchemaType,
-        format: Option<&str>,
-        min_value: &Option<Number>,
+        _: Option<&str>,
+        _: &Option<Number>,
     ) -> Result<String> {
-        let is_unsigned = match min_value {
-            Some(min) => min.as_i64().unwrap_or(-1) == 0,
-            None => false,
-        };
-        let default_int = Ok("i32".to_string());
-        let default_float = Ok("f64".to_string());
+        let default_number = Ok("number".to_string());
 
         match oas3_type {
             SchemaType::String => Ok("String".to_string()),
-            SchemaType::Number => match format {
-                Some(format) => match format {
-                    "float" => Ok("f32".to_string()),
-                    "double" => Ok("f64".to_string()),
-                    _ => default_float,
-                },
-                None => default_float,
-            },
-            SchemaType::Integer => match format {
-                Some(format) => match format {
-                    "int32" => {
-                        if is_unsigned {
-                            Ok("u32".to_string())
-                        } else {
-                            Ok("i32".to_string())
-                        }
-                    }
-                    "int64" => {
-                        if is_unsigned {
-                            Ok("u64".to_string())
-                        } else {
-                            Ok("i64".to_string())
-                        }
-                    }
-                    _ => default_int,
-                },
-                None => default_int,
-            },
+            SchemaType::Number => default_number,
+            SchemaType::Integer => default_number,
             SchemaType::Boolean => Ok("bool".to_string()),
             SchemaType::Array => Ok("Array".to_string()),
             _ => Err(Error::Codegen(format!("Unsupported type: {:?}", oas3_type))),
@@ -105,7 +74,7 @@ impl<'a> Parser for ParserImpl<'a> {
 
 fn run() -> Result<()> {
     let spec = input::read_and_parse()?;
-    ParserImpl::new().generate(&spec)?;
+    CodegenImpl::new().generate(&spec)?;
     Ok(())
 }
 
@@ -121,80 +90,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_map_oas3_to_output_type_f32() {
-        let schema_type = SchemaType::Number;
-        let format = Some("float");
+    fn test_map_oas3_to_output_type_number() {
+        let schema_type = SchemaType::Integer;
+        let format = None;
         let min_value = None;
         assert_eq!(
-            ParserImpl::new()
+            CodegenImpl::new()
                 .map_oas3_to_output_type(schema_type, format, &min_value)
                 .unwrap(),
-            "f32"
-        );
-    }
-
-    #[test]
-    fn test_map_oas3_to_output_type_f64() {
-        let schema_type = SchemaType::Number;
-        let format = Some("double");
-        let min_value = None;
-        assert_eq!(
-            ParserImpl::new()
-                .map_oas3_to_output_type(schema_type, format, &min_value)
-                .unwrap(),
-            "f64"
-        );
-    }
-
-    #[test]
-    fn test_map_oas3_to_output_type_i32() {
-        let schema_type = SchemaType::Integer;
-        let format = Some("int32");
-        let min_value = None;
-        assert_eq!(
-            ParserImpl::new()
-                .map_oas3_to_output_type(schema_type, format, &min_value)
-                .unwrap(),
-            "i32"
-        );
-    }
-
-    #[test]
-    fn test_map_oas3_to_output_type_u32() {
-        let schema_type = SchemaType::Integer;
-        let format = Some("int32");
-        let min_value = Some(Number::from(0));
-        assert_eq!(
-            ParserImpl::new()
-                .map_oas3_to_output_type(schema_type, format, &min_value)
-                .unwrap(),
-            "u32"
-        );
-    }
-
-    #[test]
-    fn test_map_oas3_to_output_type_i64() {
-        let schema_type = SchemaType::Integer;
-        let format = Some("int64");
-        let min_value = None;
-        assert_eq!(
-            ParserImpl::new()
-                .map_oas3_to_output_type(schema_type, format, &min_value)
-                .unwrap(),
-            "i64"
-        );
-    }
-
-    #[test]
-    fn map_oas3_to_output_type_u64_test() {
-        let schema_type = SchemaType::Integer;
-        let format = Some("int64");
-        let min_value = Some(Number::from(0));
-        assert_eq!(
-            ParserImpl::new()
-                .map_oas3_to_output_type(schema_type, format, &min_value)
-                .unwrap(),
-            "u64"
+            "number"
         );
     }
 
@@ -204,7 +108,7 @@ mod tests {
         let format = None;
         let min_value = None;
         assert_eq!(
-            ParserImpl::new()
+            CodegenImpl::new()
                 .map_oas3_to_output_type(schema_type, format, &min_value)
                 .unwrap(),
             "String"
@@ -217,7 +121,7 @@ mod tests {
         let format = None;
         let min_value = None;
         assert_eq!(
-            ParserImpl::new()
+            CodegenImpl::new()
                 .map_oas3_to_output_type(schema_type, format, &min_value)
                 .unwrap(),
             "bool"
@@ -230,7 +134,7 @@ mod tests {
         let format = None;
         let min_value = None;
         assert_eq!(
-            ParserImpl::new()
+            CodegenImpl::new()
                 .map_oas3_to_output_type(schema_type, format, &min_value)
                 .unwrap(),
             "Array"
@@ -238,56 +142,30 @@ mod tests {
     }
 
     #[test]
-    fn map_oas3_to_output_type_default_int_test() {
-        let schema_type = SchemaType::Integer;
-        let format = None;
-        let min_value = None;
-        assert_eq!(
-            ParserImpl::new()
-                .map_oas3_to_output_type(schema_type, format, &min_value)
-                .unwrap(),
-            "i32"
-        );
-    }
-
-    #[test]
-    fn map_oas3_to_output_type_default_float_test() {
-        let schema_type = SchemaType::Number;
-        let format = None;
-        let min_value = None;
-        assert_eq!(
-            ParserImpl::new()
-                .map_oas3_to_output_type(schema_type, format, &min_value)
-                .unwrap(),
-            "f64"
-        );
-    }
-
-    #[test]
     fn str_to_enum_variant_test() {
-        assert_eq!(ParserImpl::new().str_to_enum_variant("test"), "Test");
-        assert_eq!(ParserImpl::new().str_to_enum_variant("TEST"), "Test");
+        assert_eq!(CodegenImpl::new().str_to_enum_variant("test"), "Test");
+        assert_eq!(CodegenImpl::new().str_to_enum_variant("TEST"), "Test");
         assert_eq!(
-            ParserImpl::new().str_to_enum_variant("Test-Test"),
+            CodegenImpl::new().str_to_enum_variant("Test-Test"),
             "TestTest"
         );
         assert_eq!(
-            ParserImpl::new().str_to_enum_variant("test test"),
+            CodegenImpl::new().str_to_enum_variant("test test"),
             "TestTest"
         );
-        assert_eq!(ParserImpl::new().str_to_enum_variant("1test"), "_1_Test");
+        assert_eq!(CodegenImpl::new().str_to_enum_variant("1test"), "_1_Test");
     }
 
     #[test]
     fn str_to_variable_name_test() {
-        assert_eq!(ParserImpl::new().str_to_variable_name("test"), "test");
+        assert_eq!(CodegenImpl::new().str_to_variable_name("test"), "test");
         assert_eq!(
-            ParserImpl::new().str_to_variable_name("test-test"),
-            "test_test"
+            CodegenImpl::new().str_to_variable_name("test-test"),
+            "testTest"
         );
         assert_eq!(
-            ParserImpl::new().str_to_variable_name("test test"),
-            "test_test"
+            CodegenImpl::new().str_to_variable_name("test test"),
+            "testTest"
         );
     }
 }
